@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animação de Círculo que Muda de Cor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/two.js/0.8.17/two.min.js"></script>
+    <style>
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        background-color: #f0f0f0;
+      }
+      #drawing {
+        border: 1px solid #000;
+      }
+    </style>
+  </head>
+  <body>
+
+    <div id="drawing"></div>
+
+    <script>
+      // Crie o ambiente Two.js
+      var elem = document.getElementById('drawing');
+      var two = new Two({
+        width: 500,
+        height: 500
+      }).appendTo(elem);
+
+      // Crie o círculo
+      var circle = two.makeCircle(two.width / 2, two.height / 2, 100); // Círculo com raio 100, centralizado
+
+      // Variáveis para controlar a transição de cor
+      var t = 0;  // Variável que controlará o ciclo de transição
+      var direction = 1;  // Direção do ciclo (1 para vermelho a azul, -1 para azul a vermelho)
+
+      // Função de atualização
+      two.bind('update', function() {
+        // Incrementar ou decrementar o valor de t dependendo da direção
+        t += 0.01 * direction;
+        
+        // Inverter a direção quando t atingir os limites (0 ou 1)
+        if (t >= 1 || t <= 0) {
+          direction *= -1;  // Inverte a direção do ciclo
+        }
+
+        // Calcular a cor com base no valor de t (transição suave de vermelho para azul)
+        var r = Math.round(255 * (1 - t));  // Componente vermelho
+        var b = Math.round(255 * t);        // Componente azul
+
+        // Definir a cor do círculo
+        circle.fill = `rgb(${r}, 0, ${b})`;
+      });
+
+      // Iniciar a animação
+      two.play();
+    </script>
+
+  </body>
+</html>

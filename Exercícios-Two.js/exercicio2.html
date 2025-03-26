@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Desenhando um Polígono Regular</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/two.js/0.8.17/two.min.js"></script>
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #f0f0f0;
+    }
+    #drawing {
+      border: 1px solid #000;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="drawing"></div>
+
+  <script>
+    var elem = document.getElementById('drawing');
+    var two = new Two({
+      width: 500,
+      height: 500
+    }).appendTo(elem);
+
+    var centerX = two.width / 2;
+    var centerY = two.height / 2;
+
+    var hexagon = two.makePolygon(centerX, centerY, 100, 6);
+    
+    hexagon.fill = '#FF0000';
+    hexagon.stroke = '#000000';
+    hexagon.linewidth = 5;
+
+    two.play();
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,37 @@
+# Ignorar arquivos de compilação do sistema
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+*.app
+
+# Ignorar diretórios de build
+build/
+bin/
+CMakeFiles/
+CMakeCache.txt
+Makefile
+CMakeLists.txt.user
+CMakeLists.txt.install
+
+# Ignorar arquivos específicos de IDEs
+.vscode/
+.idea/
+
+# Ignorar arquivos temporários do sistema operacional
+Thumbs.db
+.DS_Store
+*~
+
+# Ignorar pastas de dependências (se você usar o Git para gerenciar dependências)
+lib/
+
+# Arquivos de logs de compilação
+*.log
+
+# Ignorar bibliotecas binárias que são compiladas localmente (se não for necessário versionar)
+include/

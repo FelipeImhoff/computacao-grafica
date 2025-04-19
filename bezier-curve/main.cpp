@@ -13,15 +13,15 @@ void drawPoint(Point p, float r, float g, float b) {
     glColor3f(r, g, b);
     glPointSize(8);
     glBegin(GL_POINTS);
-        glVertex2f(p.x, p.y);
+    glVertex2f(p.x, p.y);
     glEnd();
 }
 
 void drawLine(Point a, Point b, float r, float g, float b_) {
     glColor3f(r, g, b_);
     glBegin(GL_LINES);
-        glVertex2f(a.x, a.y);
-        glVertex2f(b.x, b.y);
+    glVertex2f(a.x, a.y);
+    glVertex2f(b.x, b.y);
     glEnd();
 }
 

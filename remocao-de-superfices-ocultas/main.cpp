@@ -127,7 +127,7 @@ void display() {
 
 // Função chamada quando a janela é redimensionada
 void reshape(int w, int h) {
-    glViewport(0, 0, w, h)
+    glViewport(0, 0, w, h);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     gluPerspective(45, (float)w/h, 1, 100);

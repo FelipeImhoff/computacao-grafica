@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Contador de Exercícios com MediaPipe</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f8f9fa;
+      color: #333;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    h1 {
+      text-align: center;
+      color: #2c3e50;
+      margin-bottom: 30px;
+    }
+    .video-container {
+      position: relative;
+      width: 100%;
+      max-width: 640px;
+      margin: 0 auto;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    video {
+      width: 100%;
+      display: none;
+    }
+    canvas {
+      width: 100%;
+      display: block;
+      background-color: #000;
+    }
+    .controls {
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-top: 20px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      max-width: 640px;
+      margin: 20px auto;
+    }
+    .btn {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-right: 10px;
+      transition: background-color 0.3s;
+    }
+    .btn:hover {
+      background-color: #2980b9;
+    }
+    .btn:disabled {
+      background-color: #95a5a6;
+      cursor: not-allowed;
+    }
+    .btn.active {
+      background-color: #2ecc71;
+    }
+    .counter {
+      font-size: 24px;
+      margin: 20px 0;
+      text-align: center;
+    }
+    .status {
+      padding: 10px;
+      border-radius: 4px;
+      margin: 10px 0;
+      text-align: center;
+    }
+    .status.info { background-color: #e3f2fd; color: #1976d2; }
+    .status.success { background-color: #e8f5e9; color: #388e3c; }
+    .status.warning { background-color: #fff8e1; color: #ffa000; }
+    .status.error { background-color: #ffebee; color: #d32f2f; }
+    .exercise-info {
+      margin-top: 20px;
+    }
+    .loading {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      color: white;
+      z-index: 100;
+    }
+    .spinner {
+      border: 5px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top: 5px solid #3498db;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Contador de Exercícios com MediaPipe</h1>
+    <div class="video-container">
+      <video id="video" playsinline></video>
+      <canvas id="canvas"></canvas>
+    </div>
+    <div class="controls">
+      <div>
+        <button id="squatBtn" class="btn">Agachamento</button>
+        <button id="lateralBtn" class="btn">Elevação Lateral</button>
+      </div>
+      <div class="counter">
+        Repetições: <span id="counter">0</span>
+      </div>
+      <div id="status" class="status info">
+        Selecione um exercício para começar
+      </div>
+      <div class="exercise-info">
+        <p><strong>Medida:</strong> <span id="angle">-</span></p>
+        <p><strong>Estado:</strong> <span id="exerciseState">-</span></p>
+      </div>
+    </div>
+  </div>
+  <div id="loading" class="loading">
+    <div class="spinner"></div>
+    <p>Carregando modelos...</p>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+
+  <script>
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const squatBtn = document.getElementById("squatBtn");
+    const lateralBtn = document.getElementById("lateralBtn");
+    const counter = document.getElementById("counter");
+    const status = document.getElementById("status");
+    const angleDisplay = document.getElementById("angle");
+    const exerciseState = document.getElementById("exerciseState");
+    const loading = document.getElementById("loading");
+
+    // variáveis de estado
+    let currentExercise = null;
+    let repCount = 0;
+    let isDownPosition = false; // posição baixa do agachamento ou "mãos acima" na elevação
+    let pose = null;
+    let camera = null;
+
+    // configuração dos exercícios
+    const exercises = {
+      squat: {
+        name: "Agachamento",
+        threshold: 90, // ângulo mínimo para considerar repetição
+        resetAngle: 160, // ângulo para voltar à posição inicial
+        keypoints: {
+          hip: 23,  // quadril esquerdo
+          knee: 25, // joelho esquerdo
+          ankle: 27 // tornozelo esquerdo
+        },
+        instructions: "Desça até que suas coxas fiquem paralelas ao chão e mantenha as costas retas."
+      },
+      lateral: {
+        name: "Elevação Lateral",
+        threshold: 0.1, // tolerância para altura igual ao ombro
+        keypoints: {
+          // pulsos
+          leftWrist: 15,  
+          rightWrist: 16,
+          // ombros  
+          leftShoulder: 11,
+          rightShoulder: 12
+        },
+        instructions: "Eleve os braços até a altura dos ombros."
+      }
+    };
+
+    // inicializa o modelo
+    function initializePose() {
+      pose = new Pose({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+      });
+      pose.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: true,
+        enableSegmentation: false,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
+      pose.onResults(onResults);
+      loading.style.display = 'none';
+    }
+
+    // callback do MediaPipe
+    function onResults(results) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      ctx.save();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.scale(-1, 1);
+      ctx.translate(-canvas.width, 0);
+      ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+
+      if (results.poseLandmarks) {
+        drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 2 });
+        drawLandmarks(ctx, results.poseLandmarks, { color: '#FF0000', lineWidth: 1 });
+        if (currentExercise) {
+          processExercise(results.poseLandmarks);
+        }
+      }
+
+      ctx.restore();
+    }
+
+    // direciona para o exercício escolhido
+    function processExercise(landmarks) {
+      if (currentExercise === 'squat') {
+        processSquat(landmarks);
+      } else if (currentExercise === 'lateral') {
+        processLateral(landmarks);
+      }
+    }
+
+    // lógica do agachamento
+    function processSquat(landmarks) {
+      const config = exercises.squat;
+      const hip = landmarks[config.keypoints.hip];
+      const knee = landmarks[config.keypoints.knee];
+      const ankle = landmarks[config.keypoints.ankle];
+      if (!hip || !knee || !ankle) return;
+
+      const angle = calculateAngle(hip, knee, ankle);
+      angleDisplay.textContent = Math.round(angle) + "°";
+
+      if (angle < config.threshold && !isDownPosition) {
+        isDownPosition = true;
+        exerciseState.textContent = "Posição baixa";
+        updateStatus("Bom agachamento!", "success");
+      } else if (angle > config.resetAngle && isDownPosition) {
+        isDownPosition = false;
+        repCount++;
+        counter.textContent = repCount;
+        exerciseState.textContent = "Posição alta";
+        updateStatus(`Repetição ${repCount} concluída.`, "success");
+      }
+    }
+
+    // lógica da elevação lateral
+    function processLateral(landmarks) {
+      const config = exercises.lateral;
+
+      const lWrist = landmarks[config.keypoints.leftWrist];
+      const rWrist = landmarks[config.keypoints.rightWrist];
+      const lShoulder = landmarks[config.keypoints.leftShoulder];
+      const rShoulder = landmarks[config.keypoints.rightShoulder];
+      if (!lWrist || !rWrist || !lShoulder || !rShoulder) return;
+
+      // calcula distância vertical entre punhos e ombros
+      const lDiff = Math.abs(lWrist.y - lShoulder.y);
+      const rDiff = Math.abs(rWrist.y - rShoulder.y);
+
+      // converte para porcentagem da altura
+      angleDisplay.textContent = `L:${Math.round(lDiff*100)}% R:${Math.round(rDiff*100)}%`;
+
+      // se as duas mãos estiverem próximas à altura do ombro
+      if (lDiff < config.threshold && rDiff < config.threshold && !isDownPosition) {
+        isDownPosition = true;
+        exerciseState.textContent = "Braços elevados";
+        updateStatus("Boa elevação!", "success");
+      } else if ((lWrist.y > lShoulder.y + config.threshold && rWrist.y > rShoulder.y + config.threshold) && isDownPosition) {
+        isDownPosition = false;
+        repCount++;
+        counter.textContent = repCount;
+        exerciseState.textContent = "Braços abaixados";
+        updateStatus(`Repetição ${repCount} concluída.`, "success");
+      }
+    }
+
+    // calcula ângulo entre 3 pontos
+    function calculateAngle(a, b, c) {
+      const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
+      let angle = Math.abs(radians * 180 / Math.PI);
+      return angle > 180 ? 360 - angle : angle;
+    }
+
+    // mensagens de status
+    function updateStatus(message, type="info") {
+      status.textContent = message;
+      status.className = `status ${type}`;
+    }
+
+    // seleção de exercício
+    function selectExercise(exercise) {
+      if (!pose) {
+        updateStatus("O modelo ainda não está pronto.", "error");
+        return;
+      }
+      currentExercise = exercise;
+      const config = exercises[exercise];
+      updateStatus(config.instructions, "info");
+      exerciseState.textContent = "Posição inicial";
+      repCount = 0;
+      counter.textContent = repCount;
+      isDownPosition = false;
+
+      squatBtn.classList.toggle("active", exercise === "squat");
+      lateralBtn.classList.toggle("active", exercise === "lateral");
+    }
+
+    // inicia câmera
+    async function startCamera() {
+      try {
+        camera = new Camera(video, {
+          onFrame: async () => {
+            if (pose) await pose.send({image: video});
+          },
+          width: 640,
+          height: 480
+        });
+        await camera.start();
+      } catch (e) {
+        console.error(e);
+        updateStatus("Erro ao acessar a câmera", "error");
+        loading.style.display = 'none';
+      }
+    }
+
+    squatBtn.addEventListener("click", () => selectExercise("squat"));
+    lateralBtn.addEventListener("click", () => selectExercise("lateral"));
+
+    // inicialização
+    async function initialize() {
+      await initializePose();
+      await startCamera();
+    }
+    window.addEventListener("load", initialize);
+  </script>
+</body>
+</html>
